@@ -49,13 +49,16 @@ fn run_app(cli: Cli) -> Result<(), String> {
     let is_websocket_mode = cli.websocket;
 
     let _submitter_handle = thread::spawn(move || {
-        state_worker::run_state_worker(
+        if let Err(e) = state_worker::run_state_worker(
             submitter_rx,
             client_clone,
             api_url_clone,
             data_dir_clone,
             is_websocket_mode
-        )
+        ) {
+            eprintln!("❌ FATAL: State worker thread failed: {}", e);
+            std::process::exit(1);
+        }
     });
 
     // CLONE CLI and CONTEXT components required for the manager thread

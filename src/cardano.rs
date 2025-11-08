@@ -25,14 +25,18 @@ pub type KeyPairAndAddress = (FlexibleSecretKey, PublicKey, ShelleyAddress);
 pub fn generate_cardano_key_and_address() -> KeyPairAndAddress {
     let rng = OsRng;
 
-    // Generate Ed25519 SecretKey
+    // Generate Ed25519 SecretKey for payment
     let sk = SecretKey::new(rng);
     let vk = sk.public_key();
+
+    // Generate Ed25519 SecretKey for staking
+    let stake_sk = SecretKey::new(rng);
+    let stake_vk = stake_sk.public_key();
 
     let addr = ShelleyAddress::new(
         Network::Mainnet,
         ShelleyPaymentPart::key_hash(vk.compute_hash()),
-        ShelleyDelegationPart::Null
+        ShelleyDelegationPart::key_hash(stake_vk.compute_hash())
     );
 
     let sk_flex: FlexibleSecretKey = FlexibleSecretKey::Standard(sk);
@@ -63,15 +67,28 @@ pub fn derive_key_pair_from_mnemonic(mnemonic: &str, account: u32, index: u32) -
         .derive(ed25519_bip32::DerivationScheme::V2, 0)
         .derive(ed25519_bip32::DerivationScheme::V2, index)
         .extended_secret_key();
+
+    // staking key 1852'/1815'/<account>'/2/0
+    let stake_xprv = &xprv
+        .derive(ed25519_bip32::DerivationScheme::V2, harden_index(1852))
+        .derive(ed25519_bip32::DerivationScheme::V2, harden_index(1815))
+        .derive(ed25519_bip32::DerivationScheme::V2, harden_index(account))
+        .derive(ed25519_bip32::DerivationScheme::V2, 2)
+        .derive(ed25519_bip32::DerivationScheme::V2, 0)
+        .extended_secret_key();
+
     unsafe {
         let sk = SecretKeyExtended::from_bytes_unchecked(*pay_xprv);
         let vk = sk.public_key();
 
-        // Cardano (Shelley) address derivation
+        let stake_sk = SecretKeyExtended::from_bytes_unchecked(*stake_xprv);
+        let stake_vk = stake_sk.public_key();
+
+        // Cardano (Shelley) address derivation with staking key
         let addr = ShelleyAddress::new(
             Network::Mainnet, // Assuming Mainnet environment
             ShelleyPaymentPart::key_hash(vk.compute_hash()),
-            ShelleyDelegationPart::Null
+            ShelleyDelegationPart::key_hash(stake_vk.compute_hash())
         );
         let sk_flex: FlexibleSecretKey = FlexibleSecretKey::Extended(sk);
 
@@ -88,10 +105,15 @@ pub fn generate_cardano_key_pair_from_skey(sk_hex: &String) -> KeyPairAndAddress
     let sk = SecretKey::from(skey_array);
     let vk = sk.public_key();
 
+    // Generate a random staking key since we only have the payment key
+    let rng = OsRng;
+    let stake_sk = SecretKey::new(rng);
+    let stake_vk = stake_sk.public_key();
+
     let addr = ShelleyAddress::new(
         Network::Mainnet,
         ShelleyPaymentPart::key_hash(vk.compute_hash()),
-        ShelleyDelegationPart::Null
+        ShelleyDelegationPart::key_hash(stake_vk.compute_hash())
     );
 
     let sk_flex: FlexibleSecretKey = FlexibleSecretKey::Standard(sk);

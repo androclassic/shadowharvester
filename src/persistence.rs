@@ -10,7 +10,17 @@ pub struct Persistence {
 
 impl Persistence {
     /// Opens the Sled database at the specified path.
+    /// Creates the parent directory if it doesn't exist.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, sled::Error> {
+        let path = path.as_ref();
+        // Ensure the parent directory exists
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| sled::Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Failed to create parent directory for {:?}: {}", path, e)
+                )))?;
+        }
         let db = sled::open(path)?;
         Ok(Persistence { db })
     }
